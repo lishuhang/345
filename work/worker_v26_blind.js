@@ -718,6 +718,37 @@ async function handleYseg(yspKey, filename, request) {
 }
 
 // =================== MAIN ROUTER ===================
+// Scheduled handler — runs every 5 min via Cron Trigger
+// Checks if YSP/xuexi URLs are expired and triggers GitHub Actions refresh
+async function handleScheduled(event, env) {
+  try {
+    // Check YSP
+    const yspKeys = Object.keys(YSP_CATALOG);
+    if (yspKeys.length > 0) {
+      const ch = YSP_CATALOG[yspKeys[0]];
+      const resp = await fetch(ch.fullUrl, { method: 'HEAD', headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (resp.status === 403) {
+        console.log('YSP expired, triggering refresh');
+        await triggerRefresh();
+      }
+    }
+    // Check xuexi (if XUEXI_CATALOG exists)
+    if (typeof XUEXI_CATALOG !== 'undefined') {
+      const xkeys = Object.keys(XUEXI_CATALOG);
+      if (xkeys.length > 0) {
+        const xch = XUEXI_CATALOG[xkeys[0]];
+        const xresp = await fetch(xch.fullUrl, { method: 'HEAD', headers: { 'User-Agent': 'Mozilla/5.0' } });
+        if (xresp.status === 403) {
+          console.log('xuexi expired, triggering refresh');
+          await triggerRefresh();
+        }
+      }
+    }
+  } catch (e) {
+    console.log('Scheduled check error:', e.message);
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -784,5 +815,8 @@ export default {
     }
 
     return textResponse('Not Found', 404);
+  },
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(handleScheduled(event, env));
   },
 };
