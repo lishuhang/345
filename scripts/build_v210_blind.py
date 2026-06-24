@@ -71,7 +71,8 @@ async function handleXuexiM3u8(xuexiKey, request) {
 
   if (resp.status === 403) {
     XUEXI_CACHE.delete(xuexiKey);
-    return textResponse('xuexi m3u8 expired (403). Please refresh xuexi URLs.', 502);
+    triggerRefresh();
+    return textResponse('xuexi m3u8 expired (403). Refresh triggered.', 502);
   }
 
   if (!resp.ok) {

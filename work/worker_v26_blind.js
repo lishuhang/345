@@ -34,6 +34,27 @@ const YSP_CATALOG = JSON.parse('{"yspc01":{"name":"CCTV1","pid":"600001859","hos
 const YSP_CACHE = new Map();
 const YSP_CACHE_TTL = 3 * 60 * 60 * 1000;
 
+// Auto-refresh: trigger GitHub Actions when m3u8 returns 403
+let lastRefreshTrigger = 0;
+const REFRESH_COOLDOWN = 5 * 60 * 1000;
+async function triggerRefresh() {
+  const now = Date.now();
+  if (now - lastRefreshTrigger < REFRESH_COOLDOWN) return;
+  lastRefreshTrigger = now;
+  try {
+    await fetch('https://api.github.com/repos/lishuhang/345/actions/workflows/refresh.yml/dispatches', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'token ' + (typeof GH_TOKEN !== 'undefined' ? GH_TOKEN : ''),
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'cloudflare-worker',
+      },
+      body: JSON.stringify({ ref: 'main' }),
+    });
+  } catch (e) {}
+}
+
 
 // =================== IN-MEMORY CACHE ===================
 // We cache TWO things per (tid, id):
@@ -749,6 +770,12 @@ export default {
     // /
     if (path === '/' || path === '') {
       return handleHome(request);
+    }
+
+    // /refresh-gha
+    if (path === '/refresh-gha') {
+      triggerRefresh();
+      return textResponse('Refresh triggered', 200);
     }
 
     // /favicon.ico

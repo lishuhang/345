@@ -29,7 +29,8 @@ async function handleYspM3u8(yspKey, request) {
 
   if (resp.status === 403) {
     YSP_CACHE.delete(yspKey);
-    return textResponse('YSP m3u8 expired (403). Please refresh YSP URLs.', 502);
+    triggerRefresh();
+    return textResponse('YSP m3u8 expired (403). Refresh triggered.', 502);
   }
 
   if (!resp.ok) {
