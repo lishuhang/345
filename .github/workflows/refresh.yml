@@ -8,7 +8,7 @@ on:
 jobs:
   refresh-and-deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,12 +33,12 @@ jobs:
           mkdir -p work
           python3 scripts/fetch_xuexi_urls.py || true
 
-      - name: Refresh YSP URLs
+      - name: Refresh YSP URLs (parallel)
         run: |
           rm -f work/ysp_checkpoint.json
-          timeout 600 node scripts/gen_ysp_urls3.js || true
+          timeout 600 node scripts/gen_ysp_fast.js || true
 
-      - name: Refresh xuexi URLs
+      - name: Refresh xuexi URLs (parallel)
         run: |
           rm -f work/xuexi_checkpoint.json
           timeout 300 node scripts/gen_xuexi_fast.js || true

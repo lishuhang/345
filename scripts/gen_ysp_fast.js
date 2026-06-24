@@ -1,0 +1,100 @@
+const { chromium } = require('playwright');
+const fs = require('fs');
+const CHANNELS = [
+  { name: 'CCTV1', pid: '600001859', type: 'c', idx: '01' },
+  { name: 'CCTV2', pid: '600001800', type: 'c', idx: '02' },
+  { name: 'CCTV3', pid: '600001801', type: 'c', idx: '03' },
+  { name: 'CCTV4', pid: '600001814', type: 'c', idx: '04' },
+  { name: 'CCTV5', pid: '600001818', type: 'c', idx: '05' },
+  { name: 'CCTV5+', pid: '600001817', type: 'c', idx: '06' },
+  { name: 'CCTV6', pid: '600108442', type: 'c', idx: '07' },
+  { name: 'CCTV7', pid: '600004092', type: 'c', idx: '08' },
+  { name: 'CCTV8', pid: '600001803', type: 'c', idx: '09' },
+  { name: 'CCTV9', pid: '600004078', type: 'c', idx: '10' },
+  { name: 'CCTV10', pid: '600001805', type: 'c', idx: '11' },
+  { name: 'CCTV11', pid: '600001806', type: 'c', idx: '12' },
+  { name: 'CCTV12', pid: '600001807', type: 'c', idx: '13' },
+  { name: 'CCTV13', pid: '600001811', type: 'c', idx: '14' },
+  { name: 'CCTV14', pid: '600001809', type: 'c', idx: '15' },
+  { name: 'CCTV15', pid: '600001815', type: 'c', idx: '16' },
+  { name: 'CCTV17', pid: '600001810', type: 'c', idx: '17' },
+  { name: '北京卫视', pid: '600002309', type: 'w', idx: '01' },
+  { name: '江苏卫视', pid: '600002521', type: 'w', idx: '02' },
+  { name: '东方卫视', pid: '600002483', type: 'w', idx: '03' },
+  { name: '浙江卫视', pid: '600002520', type: 'w', idx: '04' },
+  { name: '湖南卫视', pid: '600002475', type: 'w', idx: '05' },
+  { name: '湖北卫视', pid: '600002508', type: 'w', idx: '06' },
+  { name: '广东卫视', pid: '600002485', type: 'w', idx: '07' },
+  { name: '广西卫视', pid: '600002509', type: 'w', idx: '08' },
+  { name: '黑龙江卫视', pid: '600002498', type: 'w', idx: '09' },
+  { name: '海南卫视', pid: '600002506', type: 'w', idx: '10' },
+  { name: '重庆卫视', pid: '600002531', type: 'w', idx: '11' },
+  { name: '深圳卫视', pid: '600002481', type: 'w', idx: '12' },
+  { name: '四川卫视', pid: '600002516', type: 'w', idx: '13' },
+  { name: '河南卫视', pid: '600002525', type: 'w', idx: '14' },
+  { name: '福建东南卫视', pid: '600002484', type: 'w', idx: '15' },
+  { name: '贵州卫视', pid: '600002490', type: 'w', idx: '16' },
+  { name: '江西卫视', pid: '600002503', type: 'w', idx: '17' },
+  { name: '辽宁卫视', pid: '600002505', type: 'w', idx: '18' },
+  { name: '安徽卫视', pid: '600002532', type: 'w', idx: '19' },
+  { name: '河北卫视', pid: '600002493', type: 'w', idx: '20' },
+  { name: '山东卫视', pid: '600002513', type: 'w', idx: '21' },
+  { name: '天津卫视', pid: '600152137', type: 'w', idx: '22' },
+  { name: '吉林卫视', pid: '600190405', type: 'w', idx: '23' },
+  { name: '陕西卫视', pid: '600190400', type: 'w', idx: '24' },
+  { name: '宁夏卫视', pid: '600190737', type: 'w', idx: '25' },
+  { name: '内蒙古卫视', pid: '600190401', type: 'w', idx: '26' },
+  { name: '云南卫视', pid: '600190402', type: 'w', idx: '27' },
+  { name: '山西卫视', pid: '600190407', type: 'w', idx: '28' },
+  { name: '青海卫视', pid: '600190406', type: 'w', idx: '29' },
+  { name: '西藏卫视', pid: '600190403', type: 'w', idx: '30' },
+  { name: '新疆卫视', pid: '600152138', type: 'w', idx: '31' },
+];
+
+const OUTPUT_FILE = './work/ysp_m3u8_urls.json';
+const CHECKPOINT_FILE = './work/ysp_checkpoint.json';
+let results = {};
+if (fs.existsSync(CHECKPOINT_FILE)) {
+  try { results = JSON.parse(fs.readFileSync(CHECKPOINT_FILE, 'utf8')).results || {}; } catch(e) {}
+}
+const BATCH = 5;
+
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const ctx = await browser.newContext({ userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' });
+  
+  for (let i = 0; i < CHANNELS.length; i += BATCH) {
+    const batch = CHANNELS.slice(i, i + BATCH);
+    console.log(`Batch ${Math.floor(i/BATCH)+1}: ${batch.map(c => c.name).join(', ')}`);
+    
+    const promises = batch.map(async (ch) => {
+      const key = `ysp${ch.type}${ch.idx}`;
+      if (results[key]) return;
+      const page = await ctx.newPage();
+      let m3u8Url = null;
+      page.on('response', async res => {
+        if (res.url().includes('get_live_info')) {
+          try { const b = JSON.parse(await res.text()); if (b.data && b.data.playurl) m3u8Url = b.data.playurl + b.data.extended_param; } catch(e) {}
+        }
+      });
+      try {
+        await page.goto(`https://yangshipin.cn/tv/home?pid=${ch.pid}`, { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+        await page.waitForTimeout(5000);
+        if (m3u8Url) {
+          const u = new URL(m3u8Url);
+          results[key] = { name: ch.name, pid: ch.pid, fullUrl: m3u8Url, host: u.host, path: u.pathname };
+          console.log(`  ✓ ${ch.name}`);
+        } else { console.log(`  ✗ ${ch.name}`); }
+      } catch (e) { console.log(`  ERR ${ch.name}`); }
+      await page.close();
+    });
+    
+    await Promise.all(promises);
+    fs.writeFileSync(CHECKPOINT_FILE, JSON.stringify({ results }));
+    fs.writeFileSync(OUTPUT_FILE, JSON.stringify(results, null, 2));
+  }
+  
+  await browser.close();
+  try { fs.unlinkSync(CHECKPOINT_FILE); } catch(e) {}
+  console.log(`\nSaved ${Object.keys(results).length} channels`);
+})();
