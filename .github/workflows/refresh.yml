@@ -2,9 +2,8 @@ name: Refresh URLs and Deploy
 
 on:
   schedule:
-    # Run every 20 minutes (auth_key TTL is ~30 min)
     - cron: '*/20 * * * *'
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
 
 jobs:
   refresh-and-deploy:
@@ -29,31 +28,20 @@ jobs:
           npm install playwright
           npx playwright install chromium --with-deps
 
-      - name: Setup workspace
-        run: |
-          mkdir -p work scripts
-          # Copy scripts to workspace
-          cp scripts/*.js scripts/ || true
-          cp scripts/*.py scripts/ || true
-
       - name: Prepare data files
         run: |
-          # Fetch the latest channel lists from xuexi.cn
+          mkdir -p work
           python3 scripts/fetch_xuexi_urls.py || true
-          # YSP channel list is static (embedded in gen_ysp_urls3.js)
-          # xuexi base URLs are fetched by fetch_xuexi_urls.py
 
       - name: Refresh YSP URLs
         run: |
           rm -f work/ysp_checkpoint.json
           timeout 600 node scripts/gen_ysp_urls3.js || true
-          echo "YSP URLs: $(cat work/ysp_m3u8_urls.json 2>/dev/null | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)"
 
       - name: Refresh xuexi URLs
         run: |
           rm -f work/xuexi_checkpoint.json
           timeout 300 node scripts/gen_xuexi_fast.js || true
-          echo "xuexi URLs: $(cat work/xuexi_m3u8_authed.json 2>/dev/null | python3 -c 'import json,sys; print(len(json.load(sys.stdin)))' 2>/dev/null || echo 0)"
 
       - name: Build Worker
         run: |
@@ -74,10 +62,6 @@ jobs:
           sleep 5
           STATUS=$(curl -s "https://iptv345.lishuhang.workers.dev/" | head -1)
           echo "Worker status: $STATUS"
-          # Test a xuexi channel
-          curl -s -o /dev/null -w "xuexi test: %{http_code}\n" "https://iptv345.lishuhang.workers.dev/xuexi_b2e730bc.m3u8" || true
-          # Test 345 channel
-          curl -s -o /dev/null -w "345 test: %{http_code}\n" "https://iptv345.lishuhang.workers.dev/gt5.m3u8" || true
 
       - name: Commit updated URLs
         run: |

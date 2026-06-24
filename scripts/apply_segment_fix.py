@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Apply the xuexi segment proxy fix to the built worker."""
-with open('/workspace/work/worker_v210_blind.js', 'r') as f:
+with open('./work/worker_v210_blind.js', 'r') as f:
     code = f.read()
 
 # Fix 1: rewriteXuexiM3u8
@@ -64,6 +64,6 @@ new4 = '''    // /xseg2/<host>/<path>  (xuexi segment proxy)
     }'''
 code = code.replace(old4, new4)
 
-with open('/workspace/work/worker_v210_blind.js', 'w') as f:
+with open('./work/worker_v210_blind.js', 'w') as f:
     f.write(code)
 print('Segment fix applied')

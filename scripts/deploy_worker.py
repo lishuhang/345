@@ -5,7 +5,7 @@ import urllib.request, ssl, os, json, sys
 CF_API_TOKEN = os.environ.get('CF_API_TOKEN', '')
 ACCOUNT_ID = os.environ.get('ACCOUNT_ID', '')
 WORKER_NAME = 'iptv345'
-WORKER_FILE = '/workspace/work/worker.js'
+WORKER_FILE = './work/worker.js'
 
 ctx = ssl.create_default_context()
 ctx.check_hostname = False

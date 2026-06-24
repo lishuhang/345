@@ -1,6 +1,6 @@
 const { chromium } = require('/home/z/.npm-global/lib/node_modules/playwright');
 const fs = require('fs');
-const channels = JSON.parse(fs.readFileSync('/home/z/my-project/work/xuexi_m3u8_urls.json', 'utf8'));
+const channels = JSON.parse(fs.readFileSync('./work/xuexi_m3u8_urls.json', 'utf8'));
 const results = {};
 const BATCH = 5;
 
@@ -39,10 +39,10 @@ const BATCH = 5;
     
     await Promise.all(promises);
     // Save checkpoint
-    fs.writeFileSync('/home/z/my-project/work/xuexi_m3u8_authed.json', JSON.stringify(results, null, 2));
+    fs.writeFileSync('./work/xuexi_m3u8_authed.json', JSON.stringify(results, null, 2));
   }
   
   await browser.close();
-  fs.writeFileSync('/home/z/my-project/work/xuexi_m3u8_authed.json', JSON.stringify(results, null, 2));
+  fs.writeFileSync('./work/xuexi_m3u8_authed.json', JSON.stringify(results, null, 2));
   console.log(`\nSaved ${Object.keys(results).length} channels`);
 })();

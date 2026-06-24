@@ -53,8 +53,8 @@ const CHANNELS = [
   { name: '新疆卫视', pid: '600152138', type: 'w', idx: '31' },
 ];
 
-const OUTPUT_FILE = '/home/z/my-project/work/ysp_m3u8_urls.json';
-const CHECKPOINT_FILE = '/home/z/my-project/work/ysp_checkpoint.json';
+const OUTPUT_FILE = './work/ysp_m3u8_urls.json';
+const CHECKPOINT_FILE = './work/ysp_checkpoint.json';
 
 // Load checkpoint
 let results = {};
@@ -148,6 +148,6 @@ if (fs.existsSync(CHECKPOINT_FILE)) {
       listLines.push(`${ch.name},https://iptv345.lishuhang.workers.dev/${key}.m3u8`);
     }
   }
-  fs.writeFileSync('/home/z/my-project/work/list-ysp.txt', listLines.join('\n') + '\n');
+  fs.writeFileSync('./work/list-ysp.txt', listLines.join('\n') + '\n');
   console.log(`Saved list-ysp.txt (${listLines.length} entries)`);
 })();

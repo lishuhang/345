@@ -3,7 +3,7 @@
 import json, re
 
 # Load xuexi URLs
-with open('/home/z/my-project/work/xuexi_m3u8_authed.json', 'r') as f:
+with open('./work/xuexi_m3u8_authed.json', 'r') as f:
     xuexi_urls = json.load(f)
 
 xuexi_catalog = {}
@@ -19,7 +19,7 @@ xuexi_json = json.dumps(xuexi_catalog, ensure_ascii=False, separators=(',', ':')
 xuexi_json_escaped = xuexi_json.replace('\\', '\\\\').replace("'", "\\'")
 
 # Read the v2.7 blind worker (current base)
-with open('/home/z/my-project/work/worker_v26_blind.js', 'r') as f:
+with open('./work/worker_v26_blind.js', 'r') as f:
     code = f.read()
 
 # Step 1: Insert XUEXI_CATALOG after YSP_CACHE
@@ -195,6 +195,6 @@ new_status = """  statusLine += okYsp ? 'ysp ok' : 'ysp error'; if (!okYsp) allO
 code = code.replace(old_status, new_status)
 print('4. Updated handleHome with xuexi health check')
 
-with open('/home/z/my-project/work/worker_v210_blind.js', 'w') as f:
+with open('./work/worker_v210_blind.js', 'w') as f:
     f.write(code)
 print(f'\nv2.10 blind: {len(code)} bytes, xuexi: {len(xuexi_catalog)} channels')

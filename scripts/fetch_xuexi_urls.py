@@ -138,7 +138,7 @@ for key, data in results.items():
         print(f"    ERROR: {e}")
 
 # Save results
-with open('/home/z/my-project/work/xuexi_m3u8_urls.json', 'w') as f:
+with open('./work/xuexi_m3u8_urls.json', 'w') as f:
     json.dump(results, f, ensure_ascii=False, indent=2)
 print(f"\nSaved {len(results)} channels to xuexi_m3u8_urls.json")
 
@@ -146,6 +146,6 @@ print(f"\nSaved {len(results)} channels to xuexi_m3u8_urls.json")
 lines = []
 for key, data in results.items():
     lines.append(f"{data['name']},https://iptv345.lishuhang.workers.dev/{key}.m3u8")
-with open('/home/z/my-project/work/xuexi-iptv.txt', 'w') as f:
+with open('./work/xuexi-iptv.txt', 'w') as f:
     f.write('\n'.join(lines) + '\n')
 print(f"Saved xuexi-iptv.txt ({len(lines)} entries)")
