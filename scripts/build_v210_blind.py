@@ -2,9 +2,15 @@
 """Build v2.10 blind worker with xuexi support."""
 import json, re
 
-# Load xuexi URLs
-with open('./work/xuexi_m3u8_authed.json', 'r') as f:
-    xuexi_urls = json.load(f)
+# Load xuexi URLs (optional — may not exist in YSP-only workflow)
+import os
+xuexi_urls = {}
+if os.path.exists('./work/xuexi_m3u8_authed.json'):
+    with open('./work/xuexi_m3u8_authed.json', 'r') as f:
+        xuexi_urls = json.load(f)
+    print(f'Loaded xuexi: {len(xuexi_urls)} channels')
+else:
+    print('WARNING: xuexi_m3u8_authed.json not found, building without xuexi')
 
 xuexi_catalog = {}
 for key, data in xuexi_urls.items():
