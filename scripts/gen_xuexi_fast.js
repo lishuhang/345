@@ -1,4 +1,4 @@
-const { chromium } = require('/home/z/.npm-global/lib/node_modules/playwright');
+const { chromium } = require('playwright');
 const fs = require('fs');
 const channels = JSON.parse(fs.readFileSync('./work/xuexi_m3u8_urls.json', 'utf8'));
 const results = {};

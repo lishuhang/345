@@ -1,5 +1,5 @@
 // Optimized: single page reuse + incremental save + checkpoint
-const { chromium } = require('/home/z/.npm-global/lib/node_modules/playwright');
+const { chromium } = require('playwright');
 const fs = require('fs');
 
 const CHANNELS = [
