@@ -1,0 +1,207 @@
+{
+  "xuexi_b2e730bc": {
+    "name": "北京卫视",
+    "id": "b2e730bcb7e8468ea028135c602a561d",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/bjtv_merge_qhd.m3u8"
+  },
+  "xuexi_f34309e5": {
+    "name": "天津卫视",
+    "id": "f34309e518fb41579c46cbef4d56c51d",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/tjtv_merge_qhd.m3u8"
+  },
+  "xuexi_39f6908c": {
+    "name": "河北卫视",
+    "id": "39f6908c16d74aeab67c78eeb37e17dd",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/hebeitv_merge_qhd.m3u8"
+  },
+  "xuexi_39c3c722": {
+    "name": "山西卫视",
+    "id": "39c3c7226f754f3e9cbebd8b5f0996ee",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/shanxitv_merge_qhd.m3u8"
+  },
+  "xuexi_196d1fb7": {
+    "name": "辽宁卫视",
+    "id": "196d1fb7186845c8ab06945beb60f428",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/lntv_merge_qhd.m3u8"
+  },
+  "xuexi_74dd173b": {
+    "name": "内蒙古卫视",
+    "id": "74dd173b302c4aa9abf142e4034e0c87",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/nmhtv_merge_qhd.m3u8"
+  },
+  "xuexi_3072aafb": {
+    "name": "内蒙古蒙语卫视",
+    "id": "3072aafb60c3466caab1f80cb017b261",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/nmmtv_merge_qhd.m3u8"
+  },
+  "xuexi_0bb93494": {
+    "name": "吉林卫视",
+    "id": "0bb934949fe549e9be4ea3ff519eaec4",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/jltv_merge_qhd.m3u8"
+  },
+  "xuexi_9e532e80": {
+    "name": "延边卫视",
+    "id": "9e532e8007d64f18892f044190391cf0",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/ybtv_merge_qhd.m3u8"
+  },
+  "xuexi_c77741c7": {
+    "name": "黑龙江卫视",
+    "id": "c77741c71cbb4f61bc9876826e267b51",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/hljtv_merge_qhd.m3u8"
+  },
+  "xuexi_b03d633a": {
+    "name": "东方卫视",
+    "id": "b03d633a64f14712b1b78ad5336fac2c",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/dftv_merge_qhd.m3u8"
+  },
+  "xuexi_f485de42": {
+    "name": "江苏卫视",
+    "id": "f485de429c064333b7cce20c6bbbc905",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/jstv_merge_qhd.m3u8"
+  },
+  "xuexi_0b093694": {
+    "name": "浙江卫视",
+    "id": "0b0936946bd7416fa80aaeb4072f369a",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/zjtv_merge_qhd.m3u8"
+  },
+  "xuexi_633fd677": {
+    "name": "安徽卫视",
+    "id": "633fd677b4ce40ad85b127db4307921a",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/ahtv_merge_qhd.m3u8"
+  },
+  "xuexi_74cd6a04": {
+    "name": "东南卫视",
+    "id": "74cd6a0403ff4ce7829f04d4cdf4c0a5",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/dntv_merge_qhd.m3u8"
+  },
+  "xuexi_2eb43b20": {
+    "name": "海峡卫视",
+    "id": "2eb43b20727e4218af6f26850b51ccee",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/hxtv_merge_qhd.m3u8"
+  },
+  "xuexi_06219123": {
+    "name": "江西卫视",
+    "id": "0621912339cf40109a945afafc3069e2",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/jxtv_merge_qhd.m3u8"
+  },
+  "xuexi_15d651d2": {
+    "name": "山东卫视",
+    "id": "15d651d2389d46ba86eda710fcc1f68b",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/sdtv_merge_qhd.m3u8"
+  },
+  "xuexi_c3232ed3": {
+    "name": "山东教育卫视",
+    "id": "c3232ed33d6842d6b4e57029572650d7",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/sdetv_merge_qhd.m3u8"
+  },
+  "xuexi_47ebcda8": {
+    "name": "河南卫视",
+    "id": "47ebcda850e74c83897dd90ca72db658",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/henantv_merge_qhd.m3u8"
+  },
+  "xuexi_894c6f10": {
+    "name": "湖北卫视",
+    "id": "894c6f103e094ab58f51cf0f96870a3d",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/hubeitv_merge_qhd.m3u8"
+  },
+  "xuexi_6766ec77": {
+    "name": "广东卫视",
+    "id": "6766ec7717d64744bdbfd1c2068ebae6",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/gdtv_merge_qhd.m3u8"
+  },
+  "xuexi_b3b303ac": {
+    "name": "大湾区卫视",
+    "id": "b3b303acc4294b95bce47806bfee21bb",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/nftv_merge_qhd.m3u8"
+  },
+  "xuexi_f9a9f782": {
+    "name": "深圳卫视",
+    "id": "f9a9f782beb94edc862b8d9cc8803f1a",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/sztv_merge_qhd.m3u8"
+  },
+  "xuexi_d45e1b2d": {
+    "name": "广西卫视",
+    "id": "d45e1b2dbae6465a9b2e7a14f7749119",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/gxtv_merge_qhd.m3u8"
+  },
+  "xuexi_54e5f81a": {
+    "name": "海南卫视",
+    "id": "54e5f81a605e428188bf7ff21c0df64c",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/lytv_merge_qhd.m3u8"
+  },
+  "xuexi_8751b623": {
+    "name": "重庆卫视",
+    "id": "8751b6235e174eb6b8d3e60d963e9140",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/cqtv_merge_qhd.m3u8"
+  },
+  "xuexi_90edcdb6": {
+    "name": "四川卫视",
+    "id": "90edcdb6a18446d594228039a519b779",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/sctv_merge_qhd.m3u8"
+  },
+  "xuexi_2e1b591d": {
+    "name": "康巴卫视",
+    "id": "2e1b591d66be474cbb11b23d425bff07",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/kbtv_merge_qhd.m3u8"
+  },
+  "xuexi_d6fc64f8": {
+    "name": "贵州卫视",
+    "id": "d6fc64f8f5e34444ba703bb79fda5da8",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/gztv_merge_qhd.m3u8"
+  },
+  "xuexi_f79e9c26": {
+    "name": "云南卫视",
+    "id": "f79e9c261fda4c3ba35d075a51814bbd",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/yntv_merge_qhd.m3u8"
+  },
+  "xuexi_c52bd0a9": {
+    "name": "西藏卫视",
+    "id": "c52bd0a9ac294559841fa39d28d2c195",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/xztv_merge_qhd.m3u8"
+  },
+  "xuexi_c6f0ce26": {
+    "name": "西藏藏语卫视",
+    "id": "c6f0ce262392415d87194371daee8d50",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/xzzytv_merge_qhd.m3u8"
+  },
+  "xuexi_63fbcee7": {
+    "name": "陕西卫视",
+    "id": "63fbcee70e0140c991541b5412c9552d",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/shaanxitv_merge_qhd.m3u8"
+  },
+  "xuexi_dc13ed51": {
+    "name": "甘肃卫视",
+    "id": "dc13ed51077a4200a8a41e5e02457fdb",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/gstv_merge_qhd.m3u8"
+  },
+  "xuexi_49718a9c": {
+    "name": "青海卫视",
+    "id": "49718a9c8d364f6b8c6e666739e90780",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/qhtv_merge_qhd.m3u8"
+  },
+  "xuexi_c6d8fd41": {
+    "name": "青海安多卫视",
+    "id": "c6d8fd4109504b95b5c6f46b9f5910e9",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/qhadtv_merge_qhd.m3u8"
+  },
+  "xuexi_782bc32a": {
+    "name": "宁夏卫视",
+    "id": "782bc32aad614b6c9c078fd7bea95488",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/nxtv_merge_qhd.m3u8"
+  },
+  "xuexi_95b30ad2": {
+    "name": "新疆卫视",
+    "id": "95b30ad2b3c14b32ac7f915769d080bb",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/xjtv_merge_qhd.m3u8"
+  },
+  "xuexi_16bcdb12": {
+    "name": "兵团卫视",
+    "id": "16bcdb12d690488286ffec580c9ca249",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/bttv_merge_qhd.m3u8"
+  },
+  "xuexi_416c4a41": {
+    "name": "CETV1教育综合",
+    "id": "416c4a41549741eab72b1dbc81ea85a7",
+    "fullUrl": "https://live-pc.xuexi.cn/merged/cetv1_merge_qhd.m3u8"
+  }
+}
