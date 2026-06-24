@@ -1,3 +1,15 @@
 node_modules/
 *.log
 /tmp/
+skills/
+download/
+scripts/probe_*
+work/*.png
+work/xuexi_m3u8_authed.json
+work/xuexi_m3u8_urls.json
+work/ysp_m3u8_urls.json
+work/classify_checkpoint.json
+work/ysp_checkpoint.json
+work/xuexi_checkpoint.json
+work/default_names.json
+work/test_results.json
