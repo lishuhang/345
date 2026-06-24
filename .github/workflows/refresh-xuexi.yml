@@ -21,22 +21,22 @@ jobs:
         run: mkdir -p work && python3 scripts/fetch_xuexi_urls.py || true
       - name: Refresh xuexi URLs
         run: rm -f work/xuexi_checkpoint.json && timeout 300 node scripts/gen_xuexi_fast.js || true
-      - name: Build & Deploy
-        env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
-        run: |
-          # Download current worker from repo (has YSP URLs from last ysp refresh)
-          # Build xuexi-only update
-          python3 scripts/build_v210_blind.py
-          python3 scripts/apply_segment_fix.py
-          node --check work/worker_v210_blind.js
-          cp work/worker_v210_blind.js work/worker.js
-          python3 scripts/deploy_worker.py
-      - name: Commit
+      - name: Commit xuexi URLs
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add work/xuexi_m3u8_authed.json 2>/dev/null || true
           git commit -m "xuexi refresh $(date -u '+%H:%M')" || true
           git push || true
+      - name: Pull latest (include YSP URLs from other workflow)
+        run: git pull origin main || true
+      - name: Build & Deploy
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
+        run: |
+          python3 scripts/build_v210_blind.py
+          python3 scripts/apply_segment_fix.py
+          node --check work/worker_v210_blind.js
+          cp work/worker_v210_blind.js work/worker.js
+          python3 scripts/deploy_worker.py
