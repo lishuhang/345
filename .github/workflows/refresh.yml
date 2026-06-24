@@ -68,5 +68,5 @@ jobs:
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git add work/ysp_m3u8_urls.json work/xuexi_m3u8_authed.json 2>/dev/null || true
-          git commit -m "Auto-refresh URLs $(date -u '+%Y-%m-%d %H:%M')" || true
+          git commit -m "Auto-refresh $(date -u '+%Y-%m-%d %H:%M')" || true
           git push || true
