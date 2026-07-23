@@ -2,13 +2,13 @@ name: Refresh and Deploy
 
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: '*/10 * * * *'
   workflow_dispatch:
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,10 +19,12 @@ jobs:
         run: npm install playwright && npx playwright install chromium --with-deps
       - name: Prepare
         run: mkdir -p work && python3 scripts/fetch_xuexi_urls.py || true
-      - name: Refresh xuexi URLs
+      - name: Refresh xuexi URLs (first pass)
         run: rm -f work/xuexi_checkpoint.json && timeout 300 node scripts/gen_xuexi_fast.js || true
       - name: Refresh YSP URLs
-        run: rm -f work/ysp_checkpoint.json && timeout 600 node scripts/gen_ysp_fast.js || true
+        run: rm -f work/ysp_checkpoint.json && timeout 480 node scripts/gen_ysp_fast.js || true
+      - name: Refresh xuexi URLs (second pass, right before build)
+        run: rm -f work/xuexi_checkpoint.json && timeout 180 node scripts/gen_xuexi_fast.js || true
       - name: Build
         run: |
           python3 scripts/build_v210_blind.py
