@@ -1,4 +1,4 @@
-// 345 - live stream proxy worker · v2.9-blind
+// 345 - live stream proxy worker · v2.10-blind
 //
 // Routes:
 //   GET /                       Blind status page (returns "status: ... ok" or debug log)
@@ -9,6 +9,10 @@
 //   GET /health/<tid><id>       Quick health check for a specific channel
 //   GET /wso-<name>.m3u8        卫视官网源 proxy (calls official API to get fresh m3u8)
 //   GET /wseg/<wsoKey>/<file>   卫视官网 segment proxy
+//
+// v2.10 changes (vs v2.9-blind):
+//   - Add wso-guizhou (贵州卫视) — api.gzstv.com API (returns txSecret m3u8)
+//   - Add wso-jiangsu (江苏卫视) — zjcn-live-play.jstv.com fixed URL (needs Referer)
 //
 // v2.9 changes (vs v2.8-blind):
 //   - Add wso- (卫视官网) source support:
@@ -36,7 +40,7 @@ const XOR_KEY = "iptv.com";          // hardcoded XOR key inside pvjs.js
 const DUMMY_TOKEN = "00000000000000000000000000000000";  // any 32-hex works in play page URL
 const ORIGIN = "https://m.345iptv.com";
 
-const WORKER_VERSION = 'v2.9';
+const WORKER_VERSION = 'v2.10';
 
 // Cache TTLs
 const PLAYPHP_URL_TTL = 90 * 1000;        // 90 sec: cache resolved play.php URL (shorter = fresher token)
@@ -101,6 +105,24 @@ const WSO_CATALOG = {
       return null;
     }
   },
+  'wso-guizhou': {
+    name: '贵州卫视',
+    api: 'https://api.gzstv.com/v1/tv/ch01',
+    referer: 'https://www.gzstv.com/',
+    parseM3u8: (text) => {
+      try {
+        const d = JSON.parse(text);
+        const url = d.stream_url || (d.data && d.data.stream_url) || '';
+        return url ? { m3u8Url: url } : null;
+      } catch(e) { return null; }
+    }
+  },
+  'wso-jiangsu': {
+    name: '江苏卫视',
+    api: 'direct:https://zjcn-live-play.jstv.com/live.m3u8/jsws_live.m3u8',
+    referer: 'https://api.chinaaudiovisual.cn/',
+    parseM3u8: (text) => { return { m3u8Url: 'https://zjcn-live-play.jstv.com/live.m3u8/jsws_live.m3u8' }; }
+  }
 };
 
 // v2.9: WSO cache — resolved m3u8 URLs (5 min TTL, since they have _upt timestamps)
@@ -947,6 +969,13 @@ async function resolveWsoM3u8(wsoKey) {
     return cached.m3u8Url;
   }
 
+  // v2.10: If api starts with "direct:", return the URL without fetching
+  if (ch.api.startsWith('direct:')) {
+    const url = ch.api.substring(7);
+    wsoCache.set(wsoKey, { m3u8Url: url, ts: Date.now() });
+    return url;
+  }
+
   // Call API
   let resp;
   try {
@@ -988,6 +1017,7 @@ async function handleWsoM3u8(wsoKey, request) {
 
 async function fetchAndRewriteWsoM3u8(wsoKey, m3u8Url, ch, request) {
   let resp;
+  // m3u8Url may be reassigned on 403 retry
   try {
     resp = await fetch(m3u8Url, {
       headers: {
@@ -1000,9 +1030,27 @@ async function fetchAndRewriteWsoM3u8(wsoKey, m3u8Url, ch, request) {
   }
 
   if (resp.status === 403) {
-    // URL expired, clear cache and retry
+    // v2.10: URL expired, clear cache and retry resolve+fetch in same request
     wsoCache.delete(wsoKey);
-    return textResponse('WSO m3u8 expired (403). Will refresh on next request.', 502);
+    const freshUrl = await resolveWsoM3u8(wsoKey);
+    if (freshUrl && freshUrl !== m3u8Url) {
+      try {
+        const retryResp = await fetch(freshUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36', 'Referer': ch.referer },
+        });
+        if (retryResp.ok) {
+          m3u8Url = freshUrl;
+          resp = retryResp;
+          // Fall through to normal processing below
+        } else {
+          return textResponse('WSO m3u8 expired (403), retry also failed: ' + retryResp.status, 502);
+        }
+      } catch (e2) {
+        return textResponse('WSO m3u8 expired (403), retry error: ' + e2.message, 502);
+      }
+    } else {
+      return textResponse('WSO m3u8 expired (403). No fresh URL available.', 502);
+    }
   }
 
   if (!resp.ok) return textResponse('WSO m3u8 failed: ' + resp.status, 502);
