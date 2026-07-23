@@ -1,4 +1,4 @@
-// 345 - live stream proxy worker · v2.8-blind
+// 345 - live stream proxy worker · v2.9-blind
 //
 // Routes:
 //   GET /                       Blind status page (returns "status: ... ok" or debug log)
@@ -7,17 +7,26 @@
 //   GET /cat/<tid>              Plain-text list of items in a category
 //   GET /refresh/<tid><id>      Force refresh cached session URL for a channel
 //   GET /health/<tid><id>       Quick health check for a specific channel
+//   GET /wso-<name>.m3u8        卫视官网源 proxy (calls official API to get fresh m3u8)
+//   GET /wseg/<wsoKey>/<file>   卫视官网 segment proxy
+//
+// v2.9 changes (vs v2.8-blind):
+//   - Add wso- (卫视官网) source support:
+//     * wso-hainan  (海南卫视)  — http://ps.hnntv.cn/ps/livePlayUrl API
+//     * wso-dongnan (东南卫视)  — https://live.fjtv.net/m2o/channel/channel_info.php API
+//     * wso-shaanxi (陕西卫视)  — http://qidian.sxtvs.com/sxtoutiao/getLiveTvV11 API
+//   - WSO_CACHE: 5 min TTL for resolved m3u8 URLs (they have _upt timestamps)
+//   - /wseg/<wsoKey>/<file> proxies segments with proper Referer per source
+//   - Status page includes wso health check
+//   - Version bumped to v2.9
 //
 // v2.8 changes (vs v2.7-blind):
 //   - Add version "v2.8" to status output
 //   - Fix: 302 from play page (gt15/itv40 etc.) now returns 404 "channel not available"
-//     instead of generic 502 "play page fetch failed: 302"
 //   - Fix: 302 from m3u8 server (migu41/83 etc.) now returns 502 "channel moved at source"
-//     instead of generic "status=302"
 //   - Add /refresh/<tid><id> endpoint to force-refresh a channel's session URL
 //   - Add /health/<tid><id> endpoint for per-channel health check
-//   - Add #EXT-X-PROGRAM-DATE-TIME to m3u8 response (helps hls.js live edge detection,
-//     reduces audio pitch drift caused by stale live edge)
+//   - Add #EXT-X-PROGRAM-DATE-TIME to m3u8 response (helps hls.js live edge detection)
 //   - Add /refresh-gha endpoint to manually trigger GitHub Actions refresh (for ysp/xuexi)
 //   - Better error messages distinguish source-side issues from worker issues
 
@@ -27,7 +36,7 @@ const XOR_KEY = "iptv.com";          // hardcoded XOR key inside pvjs.js
 const DUMMY_TOKEN = "00000000000000000000000000000000";  // any 32-hex works in play page URL
 const ORIGIN = "https://m.345iptv.com";
 
-const WORKER_VERSION = 'v2.8';
+const WORKER_VERSION = 'v2.9';
 
 // Cache TTLs
 const PLAYPHP_URL_TTL = 90 * 1000;        // 90 sec: cache resolved play.php URL (shorter = fresher token)
@@ -38,6 +47,66 @@ const TS_CACHE_TTL = 600;                 // 10 min: cache .ts segments (immutab
 // TTL: 10 minutes — source may fix the channel, so re-check periodically.
 const BROKEN_CHANNEL_TTL = 10 * 60 * 1000;
 const brokenChannelCache = new Map();    // key "tid:id" -> { ts, reason }
+
+// v2.9: WSO (卫视官网) source configuration.
+// Each wso source has:
+//   name: display name
+//   api: URL to call to get fresh m3u8
+//   parseM3u8: function(responseText) -> { m3u8Url } (extracts m3u8 from API response)
+//   referer: Referer header to use when fetching m3u8 and segments
+const WSO_CATALOG = {
+  'wso-hainan': {
+    name: '海南卫视',
+    api: 'http://ps.hnntv.cn/ps/livePlayUrl?appCode=&token=&channelCode=STHaiNan_channel_lywsgq',
+    referer: 'https://www.hnntv.cn/',
+    parseM3u8: (text) => {
+      try {
+        const d = JSON.parse(text);
+        const url = (d.resultSet && d.resultSet[0] && d.resultSet[0].url) || d.url || '';
+        return url ? { m3u8Url: url } : null;
+      } catch(e) { return null; }
+    }
+  },
+  'wso-dongnan': {
+    name: '东南卫视',
+    api: 'https://live.fjtv.net/m2o/channel/channel_info.php?channel_id=5',
+    referer: 'https://www.fjtv.net/',
+    parseM3u8: (text) => {
+      try {
+        const arr = JSON.parse(text);
+        if (Array.isArray(arr)) {
+          for (const ch of arr) {
+            if (ch.m3u8) return { m3u8Url: ch.m3u8 };
+          }
+        }
+      } catch(e) {}
+      return null;
+    }
+  },
+  'wso-shaanxi': {
+    name: '陕西卫视',
+    api: 'http://qidian.sxtvs.com/sxtoutiao/getLiveTvV11?cnwestAppId=3&cnwestPlatformId=1&cnwestVersion=1.0.0&cnwestDeviceId=abcdef',
+    referer: 'https://www.sxtvs.com/',
+    parseM3u8: (text) => {
+      try {
+        const d = JSON.parse(text);
+        const list = d.data || [];
+        for (const ch of list) {
+          if (ch.id === 1131 || ch.tvChannel === 'SXBC-STAR') {
+            const url = ch.onlineUrlForandroid || ch.onlineUrlForiphone || '';
+            return url ? { m3u8Url: url } : null;
+          }
+        }
+      } catch(e) {}
+      return null;
+    }
+  },
+};
+
+// v2.9: WSO cache — resolved m3u8 URLs (5 min TTL, since they have _upt timestamps)
+const WSO_CACHE_TTL = 5 * 60 * 1000;
+const wsoCache = new Map();    // wsoKey -> { m3u8Url, ts }
+
 
 // Auto-refresh: trigger GitHub Actions when ysp/xuexi m3u8 returns 403
 // (only useful if GitHub Actions automation is set up — see v2.8-plan-0722-1822.md)
@@ -666,6 +735,23 @@ async function handleHome(request) {
   statusLine += ok345 ? '345 ok' : '345 error'; if (!ok345) allOk = false;
   statusLine += '; ';
   statusLine += okYsp ? 'ysp ok' : 'ysp error'; if (!okYsp) allOk = false;
+  // v2.9: wso health check
+  statusLine += '; ';
+  let okWso = true;
+  try {
+    const wsoKeys = Object.keys(WSO_CATALOG);
+    log('--- wso check ---');
+    log('OK wso catalog: ' + wsoKeys.length + ' channels');
+    const firstWsoKey = wsoKeys[0];
+    log('Testing wso m3u8 for ' + firstWsoKey + ' (' + WSO_CATALOG[firstWsoKey].name + ')...');
+    const wsoUrl = await resolveWsoM3u8(firstWsoKey);
+    if (wsoUrl) {
+      const wsoResp = await fetch(wsoUrl, { headers: { 'User-Agent': 'Mozilla/5.0', 'Referer': WSO_CATALOG[firstWsoKey].referer } });
+      if (wsoResp.ok) { const wsoBody = await wsoResp.text(); if (wsoBody.includes('#EXTM3U')) { log('OK wso m3u8 fetched'); } else { okWso = false; log('FAIL wso m3u8: no #EXTM3U'); } }
+      else { okWso = false; log('FAIL wso m3u8: status=' + wsoResp.status); }
+    } else { okWso = false; log('FAIL wso: resolve failed'); }
+  } catch (e) { okWso = false; log('FAIL wso: ' + e.message); }
+  statusLine += okWso ? 'wso ok' : 'wso error'; if (!okWso) allOk = false;
   if (allOk) { return new Response(statusLine + '\n', { status: 200, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', 'CDN-Cache-Control': 'no-store' } }); }
   else { return new Response(statusLine + '\n\n' + logs.join('\n') + '\n', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-cache, no-store, must-revalidate', 'CDN-Cache-Control': 'no-store' } }); }
 }
@@ -847,6 +933,175 @@ async function handleYseg(yspKey, filename, request) {
   return resp;
 }
 
+// =================== WSO (卫视官网) HANDLERS ===================
+
+// Resolve a wso channel's m3u8 URL by calling its official API.
+// Caches the result for WSO_CACHE_TTL (5 min).
+async function resolveWsoM3u8(wsoKey) {
+  const ch = WSO_CATALOG[wsoKey];
+  if (!ch) return null;
+
+  // Check cache
+  const cached = wsoCache.get(wsoKey);
+  if (cached && Date.now() - cached.ts < WSO_CACHE_TTL) {
+    return cached.m3u8Url;
+  }
+
+  // Call API
+  let resp;
+  try {
+    resp = await fetch(ch.api, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Referer': ch.referer,
+      },
+    });
+  } catch (e) {
+    return null;
+  }
+  if (!resp.ok) return null;
+
+  const text = await resp.text();
+  const parsed = ch.parseM3u8(text);
+  if (!parsed || !parsed.m3u8Url) return null;
+
+  // Cache and return
+  wsoCache.set(wsoKey, { m3u8Url: parsed.m3u8Url, ts: Date.now() });
+  return parsed.m3u8Url;
+}
+
+// GET /wso-<name>.m3u8
+async function handleWsoM3u8(wsoKey, request) {
+  const ch = WSO_CATALOG[wsoKey];
+  if (!ch) return textResponse('Not found: ' + wsoKey, 404);
+
+  const m3u8Url = await resolveWsoM3u8(wsoKey);
+  if (!m3u8Url) {
+    // Clear cache and retry once
+    wsoCache.delete(wsoKey);
+    const retryUrl = await resolveWsoM3u8(wsoKey);
+    if (!retryUrl) return textResponse('WSO m3u8 resolve failed for ' + wsoKey, 502);
+    return fetchAndRewriteWsoM3u8(wsoKey, retryUrl, ch, request);
+  }
+  return fetchAndRewriteWsoM3u8(wsoKey, m3u8Url, ch, request);
+}
+
+async function fetchAndRewriteWsoM3u8(wsoKey, m3u8Url, ch, request) {
+  let resp;
+  try {
+    resp = await fetch(m3u8Url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Referer': ch.referer,
+      },
+    });
+  } catch (e) {
+    return textResponse('WSO m3u8 fetch error: ' + e.message, 502);
+  }
+
+  if (resp.status === 403) {
+    // URL expired, clear cache and retry
+    wsoCache.delete(wsoKey);
+    return textResponse('WSO m3u8 expired (403). Will refresh on next request.', 502);
+  }
+
+  if (!resp.ok) return textResponse('WSO m3u8 failed: ' + resp.status, 502);
+
+  const m3u8body = await resp.text();
+  const myOrigin = new URL(request.url).origin;
+  const segBase = `${myOrigin}/wseg/${wsoKey}/`;
+
+  // Parse the m3u8 URL to get the base path for segment resolution
+  const m3u8Parsed = new URL(m3u8Url);
+  const m3u8BasePath = m3u8Parsed.pathname.substring(0, m3u8Parsed.pathname.lastIndexOf('/') + 1);
+
+  // Rewrite segment URLs
+  let hasPdt = false;
+  const rewritten = m3u8body.split('\n').map(line => {
+    const trimmed = line.trim();
+    if (!trimmed) return line;
+    if (trimmed.startsWith('#EXT-X-PROGRAM-DATE-TIME')) hasPdt = true;
+    if (trimmed.startsWith('#')) return line;
+    // Segment URL — could be relative or absolute
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      // Absolute URL — keep as-is (wseg will proxy it)
+      return segBase + encodeURIComponent(trimmed);
+    }
+    // Relative path — resolve against m3u8 base
+    const fullUrl = m3u8Parsed.protocol + '//' + m3u8Parsed.host + m3u8BasePath + trimmed;
+    return segBase + encodeURIComponent(fullUrl);
+  }).join('\n');
+
+  // Inject PROGRAM-DATE-TIME
+  let finalBody = rewritten;
+  if (!hasPdt && rewritten.startsWith('#EXTM3U')) {
+    const nowIso = new Date().toISOString();
+    finalBody = '#EXTM3U\n#EXT-X-PROGRAM-DATE-TIME:' + nowIso + '\n' + rewritten.substring(8);
+  }
+
+  return new Response(finalBody, {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/vnd.apple.mpegurl',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'CDN-Cache-Control': 'no-store',
+      'Surrogate-Control': 'no-store',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    },
+  });
+}
+
+// GET /wseg/<wsoKey>/<encodedUrl>
+// The segment URL is URL-encoded in the path (to handle absolute URLs with query params)
+async function handleWseg(wsoKey, encodedUrl, request) {
+  const ch = WSO_CATALOG[wsoKey];
+  if (!ch) return textResponse('Not found: ' + wsoKey, 404);
+
+  let segUrl;
+  try {
+    segUrl = decodeURIComponent(encodedUrl);
+  } catch (e) {
+    return textResponse('Invalid segment URL encoding', 400);
+  }
+
+  // Cloudflare cache
+  const cacheUrl = new URL('https://wseg-cache.iptv345.local/' + wsoKey + '/' + encodedUrl.slice(0, 100));
+  const cacheKey = new Request(cacheUrl, { method: 'GET' });
+  const cache = caches.default;
+  const cached = await cache.match(cacheKey);
+  if (cached) {
+    return new Response(cached.body, {
+      status: 200,
+      headers: { 'Content-Type': 'video/mp2t', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=600', 'X-Cache': 'HIT' },
+    });
+  }
+
+  let upstream;
+  try {
+    upstream = await fetch(segUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Referer': ch.referer,
+      },
+    });
+  } catch (e) {
+    return textResponse('WSO segment error: ' + e.message, 502);
+  }
+
+  if (!upstream.ok) return textResponse('WSO segment failed: ' + upstream.status, 502);
+
+  const body = await upstream.arrayBuffer();
+  const resp = new Response(body, {
+    status: 200,
+    headers: { 'Content-Type': 'video/mp2t', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=600', 'X-Cache': 'MISS' },
+  });
+  try { cache.put(cacheKey, resp.clone()).catch(() => {}); } catch (e) {}
+  return resp;
+}
+
 // =================== MAIN ROUTER ===================
 export default {
   async fetch(request, env, ctx) {
@@ -882,6 +1137,18 @@ export default {
     const ysegMatch = path.match(/^\/yseg\/(ysp[cw]\d+)\/(.+)$/);
     if (ysegMatch) {
       return handleYseg(ysegMatch[1], ysegMatch[2], request);
+    }
+
+    // v2.9: /wso-<name>.m3u8  (卫视官网源 m3u8 proxy)
+    const wsoM3u8Match = path.match(/^\/(wso-[\w-]+)\.m3u8$/);
+    if (wsoM3u8Match) {
+      return handleWsoM3u8(wsoM3u8Match[1], request);
+    }
+
+    // v2.9: /wseg/<wsoKey>/<encodedUrl>  (卫视官网 segment proxy)
+    const wsegMatch = path.match(/^\/wseg\/(wso-[\w-]+)\/(.+)$/);
+    if (wsegMatch) {
+      return handleWseg(wsegMatch[1], wsegMatch[2], request);
     }
 
     // /<tid><id>.m3u8  (e.g. /gt5.m3u8)
