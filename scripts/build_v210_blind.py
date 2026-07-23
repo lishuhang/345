@@ -1,16 +1,60 @@
 #!/usr/bin/env python3
-"""Build v2.10 blind worker with xuexi support."""
-import json, re
+"""Build v2.8+ysp+xuexi blind worker.
+- Base: v2.8-blind.js (with /health, /refresh, broken cache, EXT-X-PROGRAM-DATE-TIME)
+- Update YSP_CATALOG: merge fresh URLs into existing catalog (preserve all 46 channels,
+  update fullUrl for successfully refreshed ones)
+- Insert xuexi handlers + routes + health check
+"""
+import json, re, os
+from urllib.parse import urlparse
 
-# Load xuexi URLs (optional — may not exist in YSP-only workflow)
-import os
+# Read base worker (v2.8-blind)
+with open('./work/worker_v26_blind.js', 'r') as f:
+    code = f.read()
+print(f'Base worker: {len(code)} bytes')
+
+# Extract existing YSP_CATALOG (46 channels with old URLs)
+ysp_catalog_match = re.search(r"const YSP_CATALOG = JSON\.parse\('(.*?)'\);", code, re.DOTALL)
+if not ysp_catalog_match:
+    print('ERROR: YSP_CATALOG not found')
+    exit(1)
+existing_ysp_str = ysp_catalog_match.group(1).replace("\\'", "'").replace("\\\\", "\\")
+existing_ysp = json.loads(existing_ysp_str)
+print(f'Existing YSP_CATALOG: {len(existing_ysp)} channels')
+
+# Load fresh YSP URLs
+ysp_fresh = {}
+if os.path.exists('./work/ysp_m3u8_urls.json'):
+    with open('./work/ysp_m3u8_urls.json', 'r') as f:
+        ysp_fresh = json.load(f)
+    print(f'Fresh YSP URLs: {len(ysp_fresh)} channels')
+
+# Merge: update fullUrl (and host/path) for refreshed channels, keep others as-is
+updated = 0
+for key, fresh_data in ysp_fresh.items():
+    if key in existing_ysp:
+        full_url = fresh_data['fullUrl']
+        parsed = urlparse(full_url)
+        existing_ysp[key]['fullUrl'] = full_url
+        existing_ysp[key]['host'] = parsed.netloc
+        existing_ysp[key]['path'] = parsed.path
+        existing_ysp[key]['pid'] = fresh_data.get('pid', existing_ysp[key].get('pid', ''))
+        updated += 1
+print(f'Updated {updated}/{len(existing_ysp)} channels with fresh URLs')
+
+# Write back YSP_CATALOG
+new_ysp_json = json.dumps(existing_ysp, ensure_ascii=False, separators=(',', ':'))
+new_ysp_json_escaped = new_ysp_json.replace('\\', '\\\\').replace("'", "\\'")
+new_ysp_line = f"const YSP_CATALOG = JSON.parse('{new_ysp_json_escaped}');"
+code = code[:ysp_catalog_match.start()] + new_ysp_line + code[ysp_catalog_match.end():]
+print('1. Updated YSP_CATALOG')
+
+# Load xuexi URLs
 xuexi_urls = {}
 if os.path.exists('./work/xuexi_m3u8_authed.json'):
     with open('./work/xuexi_m3u8_authed.json', 'r') as f:
         xuexi_urls = json.load(f)
     print(f'Loaded xuexi: {len(xuexi_urls)} channels')
-else:
-    print('WARNING: xuexi_m3u8_authed.json not found, building without xuexi')
 
 xuexi_catalog = {}
 for key, data in xuexi_urls.items():
@@ -24,23 +68,18 @@ for key, data in xuexi_urls.items():
 xuexi_json = json.dumps(xuexi_catalog, ensure_ascii=False, separators=(',', ':'))
 xuexi_json_escaped = xuexi_json.replace('\\', '\\\\').replace("'", "\\'")
 
-# Read the v2.7 blind worker (current base)
-with open('./work/worker_v26_blind.js', 'r') as f:
-    code = f.read()
-
-# Step 1: Insert XUEXI_CATALOG after YSP_CACHE
-xuexi_const = f"\n\n// XUEXI CATALOG\nconst XUEXI_CATALOG = JSON.parse('{xuexi_json_escaped}');\nconst XUEXI_CACHE = new Map();\nconst XUEXI_CACHE_TTL = 30 * 60 * 1000; // 30 min\n"
-# Find the end of YSP_CACHE_TTL line
+# Insert XUEXI_CATALOG after YSP_CACHE_TTL
+xuexi_const = f"\n\n// XUEXI CATALOG\nconst XUEXI_CATALOG = JSON.parse('{xuexi_json_escaped}');\nconst XUEXI_CACHE = new Map();\nconst XUEXI_CACHE_TTL = 30 * 60 * 1000;\n"
 ysp_ttl_end = code.find('const YSP_CACHE_TTL = 3 * 60 * 60 * 1000;')
 if ysp_ttl_end >= 0:
     ysp_ttl_line_end = code.index('\n', ysp_ttl_end) + 1
     code = code[:ysp_ttl_line_end] + xuexi_const + code[ysp_ttl_line_end:]
-    print(f'1. Inserted XUEXI_CATALOG ({len(xuexi_catalog)} channels)')
+    print(f'2. Inserted XUEXI_CATALOG ({len(xuexi_catalog)} channels)')
 else:
     print('ERROR: YSP_CACHE_TTL not found')
     exit(1)
 
-# Step 2: Add xuexi handlers before MAIN ROUTER
+# Add xuexi handlers before MAIN ROUTER
 router_marker = '// =================== MAIN ROUTER ==================='
 xuexi_handlers = """
 // =================== XUEXI HANDLERS ===================
@@ -49,15 +88,12 @@ async function handleXuexiM3u8(xuexiKey, request) {
   const ch = XUEXI_CATALOG[xuexiKey];
   if (!ch) return textResponse('Not found: ' + xuexiKey, 404);
 
-  // Check cache
   const cached = XUEXI_CACHE.get(xuexiKey);
   if (cached && Date.now() - cached.ts < XUEXI_CACHE_TTL) {
-    // Try cached URL
     try {
       const testResp = await fetch(cached.url, { method: 'HEAD', headers: { 'User-Agent': 'Mozilla/5.0' } });
       if (testResp.ok || testResp.status === 405) {
-        const m3u8Url = cached.url;
-        const resp = await fetch(m3u8Url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const resp = await fetch(cached.url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
         if (resp.ok) {
           const body = await resp.text();
           return rewriteXuexiM3u8(body, ch, request);
@@ -66,11 +102,9 @@ async function handleXuexiM3u8(xuexiKey, request) {
     } catch (e) {}
   }
 
-  // Use stored URL
-  let m3u8Url = ch.fullUrl;
   let resp;
   try {
-    resp = await fetch(m3u8Url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    resp = await fetch(ch.fullUrl, { headers: { 'User-Agent': 'Mozilla/5.0' } });
   } catch (e) {
     return textResponse('xuexi m3u8 fetch error: ' + e.message, 502);
   }
@@ -81,27 +115,20 @@ async function handleXuexiM3u8(xuexiKey, request) {
     return textResponse('xuexi m3u8 expired (403). Refresh triggered.', 502);
   }
 
-  if (!resp.ok) {
-    return textResponse('xuexi m3u8 failed: ' + resp.status, 502);
-  }
+  if (!resp.ok) return textResponse('xuexi m3u8 failed: ' + resp.status, 502);
 
-  // Cache the URL
-  XUEXI_CACHE.set(xuexiKey, { url: m3u8Url, ts: Date.now() });
-
+  XUEXI_CACHE.set(xuexiKey, { url: ch.fullUrl, ts: Date.now() });
   const body = await resp.text();
   return rewriteXuexiM3u8(body, ch, request);
 }
 
 function rewriteXuexiM3u8(m3u8body, ch, request) {
   const myOrigin = new URL(request.url).origin;
-  const segBase = myOrigin + '/xseg/' + ch.host + ch.path.replace(/[^\\/]*$/, '') + '/';
-
-  // Rewrite segment URLs (relative paths like bjtv_merge_qhd/123.ts?auth_key=...)
+  const basePath = ch.path.replace(/[^\\/]*$/, '');
   const rewritten = m3u8body.split('\\n').map(line => {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) return line;
-    // Relative path — prepend our proxy
-    return myOrigin + '/xseg/' + encodeURIComponent(ch.host + ch.path.replace(/[^\\/]*$/, '')) + '/' + encodeURIComponent(trimmed);
+    return myOrigin + '/xseg2/' + ch.host + basePath + trimmed;
   }).join('\\n');
 
   return new Response(rewritten, {
@@ -115,20 +142,14 @@ function rewriteXuexiM3u8(m3u8body, ch, request) {
   });
 }
 
-async function handleXseg(encodedPath, filename, request) {
-  // Decode the path
-  let basePath;
-  try {
-    basePath = decodeURIComponent(encodedPath);
-  } catch (e) {
-    return textResponse('Invalid path encoding', 400);
-  }
+async function handleXseg2(fullPath, request) {
+  const slashIdx = fullPath.indexOf('/');
+  if (slashIdx < 0) return textResponse('Invalid xseg2 path', 400);
+  const host = fullPath.substring(0, slashIdx);
+  const pathAndQuery = fullPath.substring(slashIdx);
+  const segUrl = 'https://' + host + pathAndQuery;
 
-  // The filename might contain query params (auth_key)
-  const segUrl = 'https://' + basePath + filename;
-
-  // Try Cloudflare cache
-  const cacheUrl = new URL('https://xseg-cache.iptv345.local/' + encodedPath + '/' + filename.slice(0, 50));
+  const cacheUrl = new URL('https://xseg-cache.iptv345.local/' + fullPath.slice(0, 100));
   const cacheKey = new Request(cacheUrl, { method: 'GET' });
   const cache = caches.default;
   const cached = await cache.match(cacheKey);
@@ -159,33 +180,30 @@ async function handleXseg(encodedPath, filename, request) {
 
 """
 code = code.replace(router_marker, xuexi_handlers + router_marker)
-print('2. Inserted xuexi handlers')
+print('3. Inserted xuexi handlers')
 
-# Step 3: Add xuexi routes
-# Find the YSP routes and add xuexi routes after them
-ysp_route_end = """    // /<tid><id>.m3u8  (e.g. /gt5.m3u8)"""
-xuexi_routes = """    // /xuexi_<id>.m3u8  (e.g. /xuexi_b2e730bc.m3u8)
-    const xuexiMatch = path.match(/^\\/(xuexi_[a-f0-9]+)\\.m3u8$/);
+# Add xuexi routes before /cat/<tid>
+xuexi_routes = """    // /xuexi_<id>.m3u8
+    const xuexiMatch = path.match(/^\\/xuexi_[a-f0-9]+\\.m3u8$/);
     if (xuexiMatch) {
-      return handleXuexiM3u8(xuexiMatch[1], request);
+      return handleXuexiM3u8(xuexiMatch[0].substring(1).replace('.m3u8',''), request);
     }
 
-    // /xseg/<encoded_base_path>/<filename>  (xuexi segment proxy)
-    const xsegMatch = path.match(/^\\/xseg\\/([^/]+)\\/(.+)$/);
-    if (xsegMatch) {
-      return handleXseg(xsegMatch[1], xsegMatch[2], request);
+    // /xseg2/<host>/<path>
+    const xseg2Match = path.match(/^\\/xseg2\\/(.+)$/);
+    if (xseg2Match) {
+      return handleXseg2(xseg2Match[1] + url.search, request);
     }
 
 """
-code = code.replace(ysp_route_end, xuexi_routes + ysp_route_end)
-print('3. Inserted xuexi routes')
+cat_route = "    // /cat/<tid>"
+code = code.replace(cat_route, xuexi_routes + cat_route)
+print('4. Inserted xuexi routes')
 
-# Step 4: Update handleHome to add xuexi health check
-# Find the ysp health check section and add xuexi after it
-old_status = """  statusLine += okYsp ? 'ysp ok' : 'ysp error'; if (!okYsp) allOk = false;"""
+# Update handleHome with xuexi health check
+old_status = "  statusLine += okYsp ? 'ysp ok' : 'ysp error'; if (!okYsp) allOk = false;"
 new_status = """  statusLine += okYsp ? 'ysp ok' : 'ysp error'; if (!okYsp) allOk = false;
   statusLine += '; ';
-  // xuexi health check
   let okXuexi = true;
   try {
     const xkeys = Object.keys(XUEXI_CATALOG);
@@ -200,8 +218,10 @@ new_status = """  statusLine += okYsp ? 'ysp ok' : 'ysp error'; if (!okYsp) allO
   } catch (e) { okXuexi = false; log('FAIL xuexi: ' + e.message); }
   statusLine += okXuexi ? 'xuexi ok' : 'xuexi error'; if (!okXuexi) allOk = false;"""
 code = code.replace(old_status, new_status)
-print('4. Updated handleHome with xuexi health check')
+print('5. Updated handleHome with xuexi health check')
 
-with open('./work/worker_v210_blind.js', 'w') as f:
+with open('./work/worker_v28_full_blind.js', 'w') as f:
     f.write(code)
-print(f'\nv2.10 blind: {len(code)} bytes, xuexi: {len(xuexi_catalog)} channels')
+print(f'\nFinal worker: {len(code)} bytes')
+print(f'  YSP: {len(existing_ysp)} channels ({updated} fresh)')
+print(f'  xuexi: {len(xuexi_catalog)} channels')

@@ -26,7 +26,6 @@ jobs:
       - name: Build
         run: |
           python3 scripts/build_v210_blind.py
-          python3 scripts/apply_segment_fix.py
           node --check work/worker_v210_blind.js
           cp work/worker_v210_blind.js work/worker.js
       - name: Deploy
