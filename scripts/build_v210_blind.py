@@ -220,7 +220,7 @@ new_status = """  statusLine += okYsp ? 'ysp ok' : 'ysp error'; if (!okYsp) allO
 code = code.replace(old_status, new_status)
 print('5. Updated handleHome with xuexi health check')
 
-with open('./work/worker_v28_full_blind.js', 'w') as f:
+with open('./work/worker_v210_blind.js', 'w') as f:
     f.write(code)
 print(f'\nFinal worker: {len(code)} bytes')
 print(f'  YSP: {len(existing_ysp)} channels ({updated} fresh)')
