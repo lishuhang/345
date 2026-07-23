@@ -1,21 +1,37 @@
 #!/usr/bin/env python3
-"""Deploy worker to Cloudflare Workers."""
+"""Deploy worker to Cloudflare Workers.
+Reads credentials from environment variables (CF_API_TOKEN, ACCOUNT_ID) or
+local .secrets file (for local development).
+"""
 import urllib.request, ssl, os, json, sys
 
-secrets = {}
-with open('/home/z/my-project/.secrets', 'r') as f:
-    for line in f:
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        if '=' in line:
-            k, v = line.split('=', 1)
-            secrets[k.strip()] = v.strip()
+# Try environment variables first (GitHub Actions), then .secrets file (local)
+CF_API_TOKEN = os.environ.get('CF_API_TOKEN', '')
+ACCOUNT_ID = os.environ.get('ACCOUNT_ID', '')
 
-CF_API_TOKEN = secrets.get('CLOUDFLARE_TOKEN', '')
-ACCOUNT_ID = secrets.get('CLOUDFLARE_ACCOUNT_ID', '')
+if not CF_API_TOKEN or not ACCOUNT_ID:
+    # Fall back to .secrets file for local development
+    secrets_path = '/home/z/my-project/.secrets'
+    if os.path.exists(secrets_path):
+        with open(secrets_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                if '=' in line:
+                    k, v = line.split('=', 1)
+                    k = k.strip()
+                    if k == 'CLOUDFLARE_TOKEN' and not CF_API_TOKEN:
+                        CF_API_TOKEN = v.strip()
+                    elif k == 'CLOUDFLARE_ACCOUNT_ID' and not ACCOUNT_ID:
+                        ACCOUNT_ID = v.strip()
+
 WORKER_NAME = sys.argv[1] if len(sys.argv) > 1 else 'iptv345'
-WORKER_FILE = sys.argv[2] if len(sys.argv) > 2 else '/home/z/my-project/download/iptv345-v2.8-blind.js'
+WORKER_FILE = sys.argv[2] if len(sys.argv) > 2 else './work/worker.js'
+
+if not CF_API_TOKEN or not ACCOUNT_ID:
+    print('ERROR: CF_API_TOKEN and ACCOUNT_ID must be set (env vars or .secrets)')
+    sys.exit(1)
 
 print(f'Deploying {WORKER_FILE}')
 print(f'  -> worker "{WORKER_NAME}"')
